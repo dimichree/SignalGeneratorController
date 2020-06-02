@@ -1,0 +1,509 @@
+classdef sgapp_tutorial < matlab.apps.AppBase
+
+    % Properties that correspond to app components
+    properties (Access = public)
+        UIFigure                   matlab.ui.Figure
+        Button                     matlab.ui.control.StateButton
+        TextArea                   matlab.ui.control.TextArea
+        POWERSpinnerLabel          matlab.ui.control.Label
+        POWERSpinner               matlab.ui.control.Spinner
+        DWELLSpinnerLabel          matlab.ui.control.Label
+        DWELLSpinner               matlab.ui.control.Spinner
+        TEMPERATUREEditFieldLabel  matlab.ui.control.Label
+        TEMPERATUREEditField       matlab.ui.control.NumericEditField
+        Gauge                      matlab.ui.control.LinearGauge
+        RFSwitchLabel              matlab.ui.control.Label
+        RFSwitch                   matlab.ui.control.Switch
+        EditField                  matlab.ui.control.EditField
+        FREQUENCYDropDownLabel     matlab.ui.control.Label
+        FREQUENCYDropDown          matlab.ui.control.DropDown
+        Lamp                       matlab.ui.control.Lamp
+        AMPLIFIERDropDownLabel     matlab.ui.control.Label
+        AMPLIFIERDropDown          matlab.ui.control.DropDown
+    end
+
+    properties (Access = private)
+        library = NET.addAssembly('C:\Users\606889\Desktop\mcl_gen64.dll'); %Import signal generator function library
+        sg = mcl_gen64.usb_gen; % create signal generator object
+        running; % create property to assign value for activity
+        l1 = 1575.42; % create property for L1 frequency
+        l2 = 1227.6; % create property for L2 frequency
+        log; % create property for logging actions
+    end
+
+    methods (Access = private)
+
+        % Code that executes after component creation
+        function startupFcn(app)
+%             Initialize properties
+            app.running = 0;
+            app.l1 = 1575.42;
+            app.l2 = 1227.6;
+            
+%             Initialize components
+%             app.RFSwitch.
+%                 Connect button
+            app.Button.Value = 0;
+            app.Button.Text = 'CONNECT';
+            app.Button.BackgroundColor = [0 1 0];
+            
+%                 RF switch
+            app.RFSwitch.Items = {'OFF', 'ON'};
+            app.RFSwitch.Value = 'OFF';
+            app.RFSwitch.Enable = 'off';
+            app.RFSwitchLabel.Enable = 'off';
+            app.Lamp.Color = [1 0 0];
+            app.Lamp.Enable = 'off';
+            
+%                 Frequency drop down
+            app.FREQUENCYDropDown.Items = {'L1'; 'L2'; 'Hop'; 'Sweep'};
+            app.FREQUENCYDropDown.Editable = 'off';
+            app.FREQUENCYDropDown.Enable = 'off';
+            app.FREQUENCYDropDownLabel.Enable = 'off';
+            app.FREQUENCYDropDown.ItemsData = [app.l1 app.l2 3 4];
+            
+%                 Power spinner
+            %{
+            app.POWERSpinner.Value = -6;
+            app.POWERSpinner.Limits = [-30, 0];
+            %}
+            app.POWERSpinner.Step = 1; %0.25;
+            app.POWERSpinner.ValueDisplayFormat = '%.2f dBm';
+            app.POWERSpinner.Editable = 'off';
+            app.POWERSpinner.Enable = 'off';
+            app.POWERSpinnerLabel.Enable = 'off';
+            
+%                 Dwell spinner
+            app.DWELLSpinner.Value = 20;
+            app.DWELLSpinner.Limits = [20, 10000];
+            app.DWELLSpinner.Step = 10; %1;
+            app.DWELLSpinner.ValueDisplayFormat = '%.0f ms';
+            app.DWELLSpinner.Editable = 'off';
+            app.DWELLSpinner.Enable = 'off';
+            app.DWELLSpinnerLabel.Enable = 'off';
+            
+%                 Temperature
+            app.TEMPERATUREEditField.Value = 0;
+            app.TEMPERATUREEditField.Editable = 'off';
+            app.TEMPERATUREEditField.ValueDisplayFormat = '%.0f °F';
+            app.TEMPERATUREEditField.Enable = 'off';
+            app.TEMPERATUREEditFieldLabel.Enable = 'off';
+            app.Gauge.Enable = 'off';
+            
+%                 System drop down
+            app.AMPLIFIERDropDown.Items = {' '; '5 W'; '30 W'};
+            app.AMPLIFIERDropDown.Editable = 'off';
+            app.AMPLIFIERDropDown.Enable = 'off';
+            app.AMPLIFIERDropDownLabel.Enable = 'off';
+            app.AMPLIFIERDropDown.ItemsData = [0 5 30];
+            
+%                 Text area
+            app.TextArea.Editable = 'off';
+            app.log = ["Press 'CONNECT' button to connect to signal generator"];
+            app.TextArea.Value = app.log;
+        end
+
+        % Value changed function: Button
+        function ButtonValueChanged(app, event)
+%             Check button state
+%                 Unpressed button state
+            if app.Button.Value == 0
+                app.sg.SetPowerOFF;
+                app.sg.Disconnect; % disconnect from signal generator
+                app.running = 0; % assign inactive activity value
+                app.Button.Text = 'CONNECT'; % assign connection button text
+                app.Button.BackgroundColor = [0 1 0]; % assign connection button background color
+                app.log(length(app.log) + 1) = ["DISCONNECTED"]; % log entry
+%                     Disable components after disconnecting from signal
+%                     generator
+                app.RFSwitch.Enable = 'off'; % disable RF switch
+                app.RFSwitchLabel.Enable = 'off';
+                app.FREQUENCYDropDown.Enable = 'off';
+                app.FREQUENCYDropDownLabel.Enable = 'off';
+                app.POWERSpinner.Editable = 'off'; % turn off power spinner editability
+                app.POWERSpinner.Enable = 'off'; % disable power spinner
+                app.POWERSpinnerLabel.Enable = 'off';
+                app.DWELLSpinner.Editable = 'off'; % turn off dwell spinner editability
+                app.DWELLSpinner.Enable = 'off'; % disable dwell spinner
+                app.DWELLSpinnerLabel.Enable = 'off';
+                app.TEMPERATUREEditField.Enable = 'off';
+                app.TEMPERATUREEditFieldLabel.Enable = 'off';
+                app.Gauge.Enable = 'off';
+                app.EditField.Enable = 'off';
+                app.Lamp.Enable = 'off';
+                app.AMPLIFIERDropDown.Enable = 'off';
+                app.AMPLIFIERDropDownLabel.Enable = 'off';
+                
+%                 Pressed button state
+            elseif app.Button.Value == 1                    
+%                     Connect to signal generator
+%                         Failure to connect
+                        app.running = 1; % assign running property as active
+                        app.Button.Text = 'DISCONNECT'; % reassign button text
+                        app.Button.BackgroundColor = [1 0 0]; % reassign button color
+                        app.log(length(app.log) + 1) = ["Connection SUCCESSFUL"]; % log entry
+%                         Enable amplifier drop down
+                        app.AMPLIFIERDropDown.Enable = 'on';
+                        app.AMPLIFIERDropDownLabel.Enable = 'on';
+                        
+%                             Enable components
+                        app.FREQUENCYDropDown.Enable = 'on';
+                        app.FREQUENCYDropDownLabel.Enable = 'on';
+                        app.DWELLSpinner.Editable = 'on'; % turn on dwell spinner editability
+                        app.DWELLSpinner.Enable = 'on'; % enable dwell spinner
+                        app.DWELLSpinnerLabel.Enable = 'on'; % enable dwell spinner label
+                        app.TEMPERATUREEditField.Enable = 'on'; % enable temperature edit field
+                        app.TEMPERATUREEditFieldLabel.Enable = 'on'; % enable temperature edit field label
+                        app.Gauge.Enable = 'on'; % enable gauge
+                        app.EditField.Enable = 'on'; % enable edit field
+%                             Step through controller component functions
+                        app.RFSwitchValueChanged; % RF
+                        app.FREQUENCYDropDownValueChanged; % Frequency
+                        app.DWELLSpinnerValueChanged; % Dwell time
+                        app.log(length(app.log) + 1) = ["Select appropriate AMPLIFIER"]; % log entry
+                        msgbox('Inspect the system to confirm the AMPLIFIER type. Selecting the incorrect AMPLIFIER could damage/destroy the system. RF and POWER will be enabled after selecting the AMPLIFIER.', 'WARNING');
+            end
+            
+            while app.running == 1 % condition for actively running
+                
+                if app.Button.Value == 0 % disconnected
+                    break
+                elseif app.Button.Value == 1 % connected
+                    
+%                     if app.sg.Check_Connection == 0
+%                         app.Button.Value = 0;
+%                         app.ButtonValueChanged;
+%                         break;
+%                     end
+                    
+                    app.TEMPERATUREEditField.Value = double(0); % request temperature
+                    app.Gauge.Value = app.TEMPERATUREEditField.Value; % assign gauge value
+                    
+                    if app.TEMPERATUREEditField.Value < 32
+%                         msgbox('Signal generator EXCEEDED operating temperatures.', 'WARNING');
+                        app.EditField.Value = 'OVERCOOLED';
+                        app.EditField.BackgroundColor = [0 0 1];
+                    elseif app.TEMPERATUREEditField.Value > 32 && app.TEMPERATUREEditField.Value < 42
+%                         msgbox('Signal generator APPROACHING extreme temperatures.', 'WARNING');
+                        app.EditField.Value = 'COOL';
+                        app.EditField.BackgroundColor = [0 0 1];
+                    elseif app.TEMPERATUREEditField.Value  > 42 && app.TEMPERATUREEditField.Value < 112
+                        app.EditField.Value = 'NOMINAL';
+                        app.EditField.BackgroundColor = [0 1 0];
+                    elseif app.TEMPERATUREEditField.Value > 112 && app.TEMPERATUREEditField.Value < 122
+%                         msgbox('Signal generator APPROACHING extreme temperatures.', 'WARNING');
+                        app.EditField.Value = 'HOT';
+                        app.EditField.BackgroundColor = [1 0 0];
+                    elseif app.TEMPERATUREEditField.Value > 122
+%                         msgbox('Signal generator EXCEEDED operating temperatures.', 'WARNING');
+                        app.EditField.Value = 'OVERHEATED';
+                        app.EditField.BackgroundColor = [1 0 0];
+                    end
+                    app.TextArea.Value = app.log;
+                    pause(1); % call for pause to prevent MATLAB from crashing
+                end
+                
+            end
+            app.TextArea.Value = app.log; % output entries to text area
+        end
+
+        % Value changed function: POWERSpinner
+        function POWERSpinnerValueChanged(app, event)
+            app.POWERSpinner.Value = round(app.POWERSpinner.Value); 
+            app.sg.SetPower(app.POWERSpinner.Value, 0); % set power
+            app.log(length(app.log) + 1) = [sprintf("POWER set to %.2f dBm", app.POWERSpinner.Value)]; % log entry
+            app.TextArea.Value = app.log; % output entries to text area
+        end
+
+        % Value changed function: DWELLSpinner
+        function DWELLSpinnerValueChanged(app, event)
+            app.DWELLSpinner.Value = round(app.DWELLSpinner.Value, -1);
+            app.log(length(app.log) + 1) = [sprintf("DWELL time set to %d ms", app.DWELLSpinner.Value)]; % log entry
+            app.TextArea.Value = app.log; % output entries to text area
+        end
+
+        % Value changed function: RFSwitch
+        function RFSwitchValueChanged(app, event)
+            if app.RFSwitch.Value == "OFF" % OFF position
+                app.sg.SetPowerOFF; % turn off RF power
+                app.log(length(app.log) + 1) = ["RF is OFF"]; % log entry    
+                app.Lamp.Color = [1 0 0]; % change lamp color to red
+            elseif app.RFSwitch.Value == "ON" % ON position
+                app.sg.SetPowerON; % turn on RF power
+                app.log(length(app.log) + 1) = ["RF is ON"]; % log entry
+                app.Lamp.Color = [0 1 0]; % change lamp color to green
+            end
+            app.TextArea.Value = app.log; % output entries to text area
+        end
+
+        % Close request function: UIFigure
+        function UIFigureCloseRequest(app, event)
+            app.sg.SetPowerOFF; % turn off RF upon close request window
+            app.sg.Disconnect; % disconnect from signal generator upon close request window
+            delete(app); % close window
+        end
+
+        % Value changed function: FREQUENCYDropDown
+        function FREQUENCYDropDownValueChanged(app, event)
+            if app.FREQUENCYDropDown.Value == app.l1 % L1 button
+                app.sg.SetFreq(app.l1, 0); % set frequency to L1
+                app.log(length(app.log) + 1) = [sprintf("FREQUENCY set to L1 (%.2f MHz)", app.l1)]; % log entry
+            elseif app.FREQUENCYDropDown.Value == app.l2 % L2 button
+                app.sg.SetFreq(app.l2, 0); % set frequency to L2
+                app.log(length(app.log) + 1) = [sprintf("FREQUENCY set to L2 (%.2f MHz)", app.l2)]; % log entry
+            elseif app.FREQUENCYDropDown.Value == 3 % Hop button
+                app.log(length(app.log) + 1) = ["FREQUENCY set to HOP from L1 and L2"]; % log entry
+                app.TextArea.Value = app.log; % output entries to text area
+                while app.FREQUENCYDropDown.Value == 3 % hop loop
+                    app.sg.SetFreq(app.l1, 0); % first frequency to hop
+                    pause(app.DWELLSpinner.Value/1000); % pause for dwell time
+                    app.sg.SetFreq(app.l2, 0); % second frequency to hop
+                    pause(app.DWELLSpinner.Value/1000); % pause for dwell time
+                    if app.running == 1 % run check-up
+                        if app.sg.Check_Connection == 0 % case for disconnection
+                            app.Button.Value = 0; % set button to unpressed position
+                            app.ButtonValueChanged; % execute button value changed callback
+                            break; % break from hop while loop
+                        end
+                        app.TEMPERATUREEditField.Value = double(app.sg.GetDeviceTemperature * 9 / 5 + 32); % request temperature
+                        app.Gauge.Value = app.TEMPERATUREEditField.Value; % assign gauge value
+                    end
+                end
+            elseif app.FREQUENCYDropDown.Value == 4 % sweep loop
+                app.log(length(app.log) + 1) = ["FREQUENCY set to SWEEP L1, L2 and 1525 - 1569 MHz"]; % log entry
+                app.TextArea.Value = app.log; % 
+                i = 0;
+                while app.FREQUENCYDropDown.Value == 4
+                    app.sg.SetFreq(1525 + i, 0);
+                    pause(app.DWELLSpinner.Value/1000);
+                    if 1525 + i == 1569
+                        app.sg.SetFreq(1575.42, 0)
+                        pause(app.DWELLSpinner.Value/1000);
+                        app.sg.SetFreq(1227.6, 0);
+                        pause(app.DWELLSpinner.Value/1000);
+                        i = 0;
+                    end
+                    i = i + 1;
+                    if app.running == 1
+                        if app.sg.Check_Connection == 0
+                            app.Button.Value = 0;
+                            app.ButtonValueChanged;
+                            break;
+                        end
+                        app.TEMPERATUREEditField.Value = double(app.sg.GetDeviceTemperature * 9 / 5 + 32); % request temperature
+                        app.Gauge.Value = app.TEMPERATUREEditField.Value; % assign gauge value
+                    end
+                end
+            end
+            app.TextArea.Value = app.log; % output entries to text area
+        end
+
+        % Value changed function: AMPLIFIERDropDown
+        function AMPLIFIERDropDownValueChanged(app, event)
+%             value = app.AMPLIFIERDropDown.Value;
+            if app.AMPLIFIERDropDown.Value == 0
+%                 set safe conditions for either amp
+                
+%                 Disable all components
+                app.RFSwitch.Enable = 'off'; % disable RF switch
+                app.RFSwitchLabel.Enable = 'off';
+                app.POWERSpinner.Editable = 'off'; % turn off power spinner editability
+                app.POWERSpinner.Enable = 'off'; % disable power spinner
+                app.POWERSpinnerLabel.Enable = 'off';
+                app.Lamp.Enable = 'off';
+%                 Turn RF off
+                app.sg.SetPowerOFF;
+                app.RFSwitch.Value = 'OFF';
+                app.RFSwitchValueChanged;
+            elseif app.AMPLIFIERDropDown.Value == 5
+%                 set 5W conditions
+                app.POWERSpinner.Value = -14;
+                app.POWERSpinner.Limits = [-30 -14];
+%                 Enable all components
+                app.RFSwitch.Enable = 'on'; % enable RF switch
+                app.RFSwitchLabel.Enable = 'on'; % enable RF switch label
+                app.POWERSpinner.Editable = 'on'; % turn off power spinner editability
+                app.POWERSpinner.Enable = 'on'; % enable power spinner
+                app.POWERSpinnerLabel.Enable = 'on'; % enable power spinner label
+                app.Lamp.Enable = 'on'; % enable lamp
+%                 Step through controller component functions
+                app.log(length(app.log) + 1) = ["5 Watt AMPLIFIER selected"]; % log entry
+                app.TextArea.Value = app.log;
+                app.RFSwitchValueChanged; % RF
+                app.POWERSpinnerValueChanged; % Power
+            elseif app.AMPLIFIERDropDown.Value == 30
+%                 set 30W conditons
+                app.POWERSpinner.Limits = [-30 -13];
+%                 Enable all components
+                app.RFSwitch.Enable = 'on'; % enable RFapp.AMPLIFIERDropDown switch
+                app.RFSwitchLabel.Enable = 'on'; % enable RF switch label
+                app.POWERSpinner.Editable = 'on'; % turn off power spinner editability
+                app.POWERSpinner.Enable = 'on'; % enable power spinner
+                app.POWERSpinnerLabel.Enable = 'on'; % enable power spinner label
+                app.Lamp.Enable = 'on'; % enable lamp
+%                 Step through controller component functions
+                app.log(length(app.log) + 1) = ["30 Watt AMPLIFIER selected"]; % log entry
+                app.TextArea.Value = app.log;
+                app.RFSwitchValueChanged; % RF
+                app.POWERSpinnerValueChanged; % Power
+            end
+        end
+    end
+
+    % App initialization and construction
+    methods (Access = private)
+
+        % Create UIFigure and components
+        function createComponents(app)
+
+            % Create UIFigure
+            app.UIFigure = uifigure;
+            app.UIFigure.Position = [100 100 640 480];
+            app.UIFigure.Name = 'UI Figure';
+            app.UIFigure.Resize = 'off';
+            app.UIFigure.CloseRequestFcn = createCallbackFcn(app, @UIFigureCloseRequest, true);
+
+            % Create Button
+            app.Button = uibutton(app.UIFigure, 'state');
+            app.Button.ValueChangedFcn = createCallbackFcn(app, @ButtonValueChanged, true);
+            app.Button.Text = 'Button';
+            app.Button.FontSize = 20;
+            app.Button.FontWeight = 'bold';
+            app.Button.Position = [246 432 150 31];
+
+            % Create TextArea
+            app.TextArea = uitextarea(app.UIFigure);
+            app.TextArea.FontSize = 16;
+            app.TextArea.Position = [1 1 640 160];
+
+            % Create POWERSpinnerLabel
+            app.POWERSpinnerLabel = uilabel(app.UIFigure);
+            app.POWERSpinnerLabel.FontSize = 20;
+            app.POWERSpinnerLabel.FontWeight = 'bold';
+            app.POWERSpinnerLabel.Position = [187 312 81 24];
+            app.POWERSpinnerLabel.Text = 'POWER';
+
+            % Create POWERSpinner
+            app.POWERSpinner = uispinner(app.UIFigure);
+            app.POWERSpinner.ValueChangedFcn = createCallbackFcn(app, @POWERSpinnerValueChanged, true);
+            app.POWERSpinner.FontSize = 20;
+            app.POWERSpinner.Position = [283 311 171 25];
+
+            % Create DWELLSpinnerLabel
+            app.DWELLSpinnerLabel = uilabel(app.UIFigure);
+            app.DWELLSpinnerLabel.FontSize = 20;
+            app.DWELLSpinnerLabel.FontWeight = 'bold';
+            app.DWELLSpinnerLabel.Position = [187 184 77 24];
+            app.DWELLSpinnerLabel.Text = 'DWELL';
+
+            % Create DWELLSpinner
+            app.DWELLSpinner = uispinner(app.UIFigure);
+            app.DWELLSpinner.ValueChangedFcn = createCallbackFcn(app, @DWELLSpinnerValueChanged, true);
+            app.DWELLSpinner.FontSize = 20;
+            app.DWELLSpinner.Position = [279 183 175 25];
+
+            % Create TEMPERATUREEditFieldLabel
+            app.TEMPERATUREEditFieldLabel = uilabel(app.UIFigure);
+            app.TEMPERATUREEditFieldLabel.HorizontalAlignment = 'center';
+            app.TEMPERATUREEditFieldLabel.FontSize = 20;
+            app.TEMPERATUREEditFieldLabel.FontWeight = 'bold';
+            app.TEMPERATUREEditFieldLabel.Position = [470 409 156 24];
+            app.TEMPERATUREEditFieldLabel.Text = 'TEMPERATURE';
+
+            % Create TEMPERATUREEditField
+            app.TEMPERATUREEditField = uieditfield(app.UIFigure, 'numeric');
+            app.TEMPERATUREEditField.HorizontalAlignment = 'center';
+            app.TEMPERATUREEditField.FontSize = 20;
+            app.TEMPERATUREEditField.Position = [489 378 118 25];
+
+            % Create Gauge
+            app.Gauge = uigauge(app.UIFigure, 'linear');
+            app.Gauge.Limits = [0 150];
+            app.Gauge.MajorTicks = [0 32 50 75 100 122 150];
+            app.Gauge.Orientation = 'vertical';
+            app.Gauge.ScaleColors = [1 0 0;1 1 0;0 1 0;1 1 0;1 0 0];
+            app.Gauge.ScaleColorLimits = [0 32;32 42;42 112;112 122;122 150];
+            app.Gauge.FontSize = 16;
+            app.Gauge.Position = [489 207 118 166];
+
+            % Create RFSwitchLabel
+            app.RFSwitchLabel = uilabel(app.UIFigure);
+            app.RFSwitchLabel.HorizontalAlignment = 'center';
+            app.RFSwitchLabel.FontSize = 20;
+            app.RFSwitchLabel.FontWeight = 'bold';
+            app.RFSwitchLabel.Position = [67 341 32 24];
+            app.RFSwitchLabel.Text = 'RF';
+
+            % Create RFSwitch
+            app.RFSwitch = uiswitch(app.UIFigure, 'slider');
+            app.RFSwitch.ValueChangedFcn = createCallbackFcn(app, @RFSwitchValueChanged, true);
+            app.RFSwitch.FontSize = 20;
+            app.RFSwitch.Position = [61 313 45 20];
+
+            % Create EditField
+            app.EditField = uieditfield(app.UIFigure, 'text');
+            app.EditField.Editable = 'off';
+            app.EditField.HorizontalAlignment = 'center';
+            app.EditField.FontSize = 18;
+            app.EditField.Position = [489 175 118 26];
+
+            % Create FREQUENCYDropDownLabel
+            app.FREQUENCYDropDownLabel = uilabel(app.UIFigure);
+            app.FREQUENCYDropDownLabel.FontSize = 20;
+            app.FREQUENCYDropDownLabel.FontWeight = 'bold';
+            app.FREQUENCYDropDownLabel.Position = [187 241 143 33];
+            app.FREQUENCYDropDownLabel.Text = 'FREQUENCY';
+
+            % Create FREQUENCYDropDown
+            app.FREQUENCYDropDown = uidropdown(app.UIFigure);
+            app.FREQUENCYDropDown.ValueChangedFcn = createCallbackFcn(app, @FREQUENCYDropDownValueChanged, true);
+            app.FREQUENCYDropDown.FontSize = 20;
+            app.FREQUENCYDropDown.Position = [329 241 125 33];
+
+            % Create Lamp
+            app.Lamp = uilamp(app.UIFigure);
+            app.Lamp.Position = [64 252 37 37];
+
+            % Create AMPLIFIERDropDownLabel
+            app.AMPLIFIERDropDownLabel = uilabel(app.UIFigure);
+            app.AMPLIFIERDropDownLabel.HorizontalAlignment = 'right';
+            app.AMPLIFIERDropDownLabel.FontSize = 20;
+            app.AMPLIFIERDropDownLabel.FontWeight = 'bold';
+            app.AMPLIFIERDropDownLabel.Position = [187 373 113 24];
+            app.AMPLIFIERDropDownLabel.Text = 'AMPLIFIER';
+
+            % Create AMPLIFIERDropDown
+            app.AMPLIFIERDropDown = uidropdown(app.UIFigure);
+            app.AMPLIFIERDropDown.ValueChangedFcn = createCallbackFcn(app, @AMPLIFIERDropDownValueChanged, true);
+            app.AMPLIFIERDropDown.FontSize = 20;
+            app.AMPLIFIERDropDown.Position = [315 372 139 25];
+        end
+    end
+
+    methods (Access = public)
+
+        % Construct app
+        function app = sgapp_tutorial
+
+            % Create and configure components
+            createComponents(app)
+
+            % Register the app with App Designer
+            registerApp(app, app.UIFigure)
+
+            % Execute the startup function
+            runStartupFcn(app, @startupFcn)
+
+            if nargout == 0
+                clear app
+            end
+        end
+
+        % Code that executes before app deletion
+        function delete(app)
+
+            % Delete UIFigure when app is deleted
+            delete(app.UIFigure)
+        end
+    end
+end
